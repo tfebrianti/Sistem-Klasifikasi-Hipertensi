@@ -47,6 +47,7 @@ interface PredictionFormState {
   setAccuracyDT: (val: number | null) => void;
   setAccuracyRF: (val: number | null) => void;
   setIsClassifying: (val: boolean) => void;
+  selectRegisteredPatient: (patient: Patient) => void;
   resetForm: () => void;
 }
 
@@ -99,6 +100,47 @@ export const usePredictionFormStore = create<PredictionFormState>((set) => ({
   setAccuracyDT: (accuracyDT) => set({ accuracyDT }),
   setAccuracyRF: (accuracyRF) => set({ accuracyRF }),
   setIsClassifying: (isClassifying) => set({ isClassifying }),
+  selectRegisteredPatient: (patient: Patient) => {
+    const records = usePredictionStore.getState().records;
+    const latestRecord = records.find((r) => r.patientId === patient.id);
+
+    const ageToSet = latestRecord?.age ?? patient.age ?? '';
+    const genderToSet = latestRecord?.gender ?? patient.gender ?? 'L';
+    const beratToSet = (latestRecord && latestRecord.weight) ? latestRecord.weight : '';
+    const tinggiToSet = (latestRecord && latestRecord.height) ? latestRecord.height : '';
+
+    let sistolikToSet: number | '' = '';
+    let diastolikToSet: number | '' = '';
+
+    if (latestRecord && latestRecord.systolic && latestRecord.diastolic) {
+      sistolikToSet = latestRecord.systolic;
+      diastolikToSet = latestRecord.diastolic;
+    } else if (patient.bpHistory && patient.bpHistory.length > 0) {
+      const lastBp = patient.bpHistory[patient.bpHistory.length - 1];
+      sistolikToSet = lastBp.systolic;
+      diastolikToSet = lastBp.diastolic;
+    }
+
+    const calculatedBmi = calculateBmi(beratToSet, tinggiToSet);
+
+    set({
+      patientType: 'registered',
+      selectedPatientId: patient.id,
+      patientName: patient.name,
+      usia: ageToSet,
+      gender: genderToSet,
+      berat: beratToSet,
+      tinggi: tinggiToSet,
+      sistolik: sistolikToSet,
+      diastolik: diastolikToSet,
+      bmi: calculatedBmi,
+      currentResult: null,
+      currentConfidence: null,
+      accuracyDT: null,
+      accuracyRF: null,
+      isSaved: false,
+    });
+  },
   resetForm: () => set({
     usia: '',
     gender: 'L',
@@ -358,39 +400,6 @@ export function usePrediction() {
     }
   };
 
-  const selectRegisteredPatient = (patient: Patient) => {
-    const records = usePredictionStore.getState().records;
-    const latestRecord = records.find((r) => r.patientId === patient.id);
-
-    store.setPatientType('registered');
-    store.setSelectedPatientId(patient.id);
-    store.setPatientName(patient.name);
-
-    // Usia: prefer latest recorded age or patient profile age
-    const ageToSet = latestRecord?.age ?? patient.age;
-    store.setUsia(ageToSet);
-
-    // Gender: prefer latest recorded gender or patient profile gender
-    const genderToSet = latestRecord?.gender ?? patient.gender;
-    store.setGender(genderToSet);
-
-    // Berat & Tinggi: auto-fill from previous history
-    if (latestRecord && latestRecord.weight && latestRecord.height) {
-      store.setBerat(latestRecord.weight);
-      store.setTinggi(latestRecord.height);
-    }
-
-    // Sistolik & Diastolik: auto-fill from latest record or bpHistory
-    if (latestRecord && latestRecord.systolic && latestRecord.diastolic) {
-      store.setSistolik(latestRecord.systolic);
-      store.setDiastolik(latestRecord.diastolic);
-    } else if (patient.bpHistory && patient.bpHistory.length > 0) {
-      const lastBp = patient.bpHistory[patient.bpHistory.length - 1];
-      store.setSistolik(lastBp.systolic);
-      store.setDiastolik(lastBp.diastolic);
-    }
-  };
-
   // Helper utility
   const minMax = (maxVal: number, val: number) => {
     return Math.min(maxVal, val);
@@ -420,7 +429,7 @@ export function usePrediction() {
     setPatientName: store.setPatientName,
     setIsSaved: store.setIsSaved,
 
-    selectRegisteredPatient,
+    selectRegisteredPatient: store.selectRegisteredPatient,
 
     currentResult: store.currentResult,
     currentConfidence: store.currentConfidence,

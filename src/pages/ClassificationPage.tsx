@@ -1,5 +1,5 @@
-import React, { useEffect } from 'react';
-import { useLocation } from 'react-router-dom';
+import React, { useEffect, useRef } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import ClinicalForm from '../features/prediction/components/ClinicalForm';
 import PredictionResult from '../features/prediction/components/PredictionResult';
 import { usePrediction } from '../features/prediction/hooks/usePrediction';
@@ -40,15 +40,22 @@ export default function ClassificationPage() {
   } = usePrediction();
 
   const location = useLocation();
+  const navigate = useNavigate();
   const importedPatient = location.state?.patient;
+  const handledPatientIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (importedPatient) {
-      selectRegisteredPatient(importedPatient);
-      // Clean router state to avoid repeating on page reload
-      window.history.replaceState({}, document.title);
+      if (handledPatientIdRef.current !== importedPatient.id) {
+        handledPatientIdRef.current = importedPatient.id;
+        selectRegisteredPatient(importedPatient);
+        // Clear router state via React Router so reloads or back/forward do not repeat
+        navigate(location.pathname, { replace: true, state: null });
+      }
+    } else {
+      handledPatientIdRef.current = null;
     }
-  }, [importedPatient, selectRegisteredPatient]);
+  }, [importedPatient, selectRegisteredPatient, navigate, location.pathname]);
 
   return (
     <div className="max-w-7xl mx-auto animate-fadeIn select-none">
